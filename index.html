@@ -1,5 +1,8 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Archivo Orla</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <!-- ORLA · sistema de archivo interno · copia no autorizada · no indexar -->
 <!-- ext. 4-17 · nota de mantenimiento: CS WEPM -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -267,7 +270,14 @@ footer a{color:var(--paper)}
     document.getElementById("h").textContent = pad(h);
     document.getElementById("m").textContent = pad(m);
     document.getElementById("s").textContent = pad(s);
+    if (now.getTime() >= target) {
+      document.getElementById("h-count").textContent = T("Llamada entrante · nº 18", "Incoming call · no. 18");
+      document.querySelector(".count .note").textContent = T("14/11/2026 · 03:17 · Origen: galería 4. Nadie ha descolgado.", "14/11/2026 · 03:17 · Origin: gallery 4. Nobody has picked up.");
+      document.getElementById("digits").style.display = "none";
+      if (!rang) { rang = true; setTimeout(renderLog, 0); }
+    }
   }
+  let rang = false;
   tick(); setInterval(tick, 1000);
 
   /* ---------- call log ---------- */
@@ -283,7 +293,7 @@ footer a{color:var(--paper)}
       tb.appendChild(tr);
     });
     const tr = document.createElement("tr"); tr.className = "next";
-    tr.innerHTML = `<td>14/11/2026</td><td>03:17:00</td><td>--:--:--</td><td>EXT. 4-17</td><td class="st">${T("Pendiente", "Pending")}</td>`;
+    tr.innerHTML = `<td>14/11/2026</td><td>03:17:00</td><td>--:--:--</td><td>EXT. 4-17</td><td class="st">${Date.now() >= target ? T("Entrante · nº 18", "Incoming · no. 18") : T("Pendiente", "Pending")}</td>`;
     tb.appendChild(tr);
   }
 
