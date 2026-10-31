@@ -242,6 +242,7 @@ footer a{color:var(--paper)}
       <li data-en="Each episode hides a code: in an image, a sound or a document.">Cada episodio esconde un código: en una imagen, en un sonido o en un documento.</li>
       <li data-en="Enter it here to open the next file.">Introdúcelo aquí para abrir el siguiente archivo.</li>
       <li data-en="Share your theories in the comments with #LacunaZero. Don't spoil codes in titles.">Comparte tus teorías en los comentarios con #LacunaZero. No reveles códigos en los títulos.</li>
+      <li id="hint-0" hidden data-en="Hint: one frame of the trailer does not belong there. Stop the video.">Pista: un fotograma del tráiler no pertenece a él. Detén el vídeo.</li>
     </ol>
   </section>
 
@@ -303,6 +304,7 @@ footer a{color:var(--paper)}
   }
   let rang = false;
   tick(); setInterval(tick, 1000);
+  document.getElementById("hint-0").hidden = Date.now() < Date.UTC(2026, 10, 17, 2, 17, 0);
 
   /* ---------- call log ---------- */
   const DUR = ["00:00:41","00:01:07","00:00:58","00:01:22","00:00:39","00:02:10","00:01:03","00:00:47",
