@@ -206,6 +206,30 @@ footer a{color:var(--paper)}
     <div id="vault"></div>
   </section>
 
+  <style>#rk[hidden],#rk-claim[hidden],#rk-card[hidden]{display:none}</style>
+  <section id="rk" aria-labelledby="h-rk" hidden>
+    <h2 id="h-rk" data-en="Investigators">Investigadores</h2>
+    <p class="note" id="rk-sum"></p>
+    <div class="term" id="rk-claim" hidden>
+      <form id="rk-f" autocomplete="off">
+        <label for="rk-alias"><span class="prompt">orla:/registro$</span> <span data-en="your alias">tu alias</span></label>
+        <input id="rk-alias" maxlength="16" spellcheck="false" style="text-transform:none" aria-describedby="rk-msg">
+        <button type="submit" data-en="Sign">Firmar</button>
+      </form>
+      <p id="rk-msg" class="note" role="status" data-en="Sign the access log. Use an alias, never your real name.">Firma el registro de accesos. Usa un alias, nunca tu nombre real.</p>
+    </div>
+    <div class="term" id="rk-card" hidden>
+      <pre id="rk-text" style="margin:0;white-space:pre-wrap;font:700 1rem var(--f-body);color:var(--paper)"></pre>
+      <button type="button" id="rk-share" style="align-self:flex-start;background:var(--amber);color:var(--bg);border:0;font:600 .8rem var(--f-label);letter-spacing:.14em;text-transform:uppercase;padding:10px 16px;cursor:pointer" data-en="Share without spoilers">Compartir sin destripar</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap" id="rk-tabs" role="group" aria-label="Clasificación"></div>
+    <div class="log-scroll"><table>
+      <thead><tr><th>#</th><th data-en="Alias">Alias</th><th id="rk-col" data-en="Time">Tiempo</th></tr></thead>
+      <tbody id="rk-rows"></tbody>
+    </table></div>
+    <p class="note" data-en="Only your alias, position and access time are public. No email or personal data is requested.">Solo son públicos tu alias, tu puesto y tu hora de acceso. No se pide correo ni ningún dato personal.</p>
+  </section>
+
   <section aria-labelledby="h-dir">
     <h2 id="h-dir" data-en="Archive contents">Contenido del archivo</h2>
     <ul class="dir" id="dir"></ul>
@@ -366,6 +390,7 @@ footer a{color:var(--paper)}
       opened = true;
       say(T("ACCESO CONCEDIDO · ficha P-4471", "ACCESS GRANTED · file P-4471"), "ok");
       document.getElementById("vault").innerHTML = html;
+      window.dispatchEvent(new CustomEvent("orla-open", {detail: n}));
       renderDir();
       document.getElementById("vault").scrollIntoView({behavior: "smooth", block: "start"});
       return;
@@ -422,5 +447,128 @@ footer a{color:var(--paper)}
   let saved = "es";
   try { saved = localStorage.getItem("orla-lang") || (navigator.language || "es").slice(0, 2); } catch(e){}
   setLang(saved === "en" ? "en" : "es");
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  const API = "https://archivo-orla-ranking.archivo-orla.workers.dev";
+  const SITE = "archivo-orla.github.io";
+  const NAMES = [["Ficha de Inés", "Inés's file"], ["Grabaciones 4-17", "Recordings 4-17"]];
+  const $ = id => document.getElementById(id);
+  const T = (es, en) => document.documentElement.lang === "en" ? en : es;
+  const store = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+  };
+  let data = null, tab = "general", pending = null, shareText = "";
+
+  function clock(secs){
+    const h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60, s = secs % 60;
+    return [h, m, s].map(x => String(x).padStart(2, "0")).join(":");
+  }
+  function key(){
+    let k = store.get("orla-key");
+    if (!k) {
+      k = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, "0")).join("");
+      store.set("orla-key", k);
+    }
+    return k;
+  }
+  async function proof(code){
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("orla-rank|" + code));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+  function render(){
+    if (!data) return;
+    $("rk").hidden = false;
+    $("rk-sum").textContent = data.investigators + T(" investigadores en el registro", " investigators on record");
+    const tabs = $("rk-tabs"); tabs.innerHTML = "";
+    const mk = (id, label) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = label; b.setAttribute("aria-pressed", tab === id);
+      b.style.cssText = "background:none;border:1px solid var(--line);color:" + (tab === id ? "var(--amber)" : "var(--fg)") + ";font:600 .75rem var(--f-label);letter-spacing:.12em;text-transform:uppercase;padding:8px 12px;cursor:pointer";
+      b.onclick = () => { tab = id; render(); };
+      tabs.appendChild(b);
+    };
+    mk("general", T("General", "Overall"));
+    data.folders.forEach(f => mk(f.id, T(...NAMES[f.id])));
+    const rows = $("rk-rows"); rows.innerHTML = "";
+    const list = tab === "general" ? data.general.map((r, i) => [i + 1, r.alias, r.points + " pts"])
+      : (data.folders.find(f => f.id === tab) || {top: []}).top.map(r => [r.pos, r.alias, clock(r.secs)]);
+    $("rk-col").textContent = tab === "general" ? T("Puntos", "Points") : T("Tiempo", "Time");
+    if (!list.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td colspan=3></td>";
+      tr.firstChild.textContent = T("Nadie ha firmado todavía. El primer puesto sigue libre.", "Nobody has signed yet. First place is still open.");
+      rows.appendChild(tr);
+    }
+    list.forEach(cells => {
+      const tr = document.createElement("tr");
+      cells.forEach(c => { const td = document.createElement("td"); td.textContent = c; tr.appendChild(td); });
+      rows.appendChild(tr);
+    });
+  }
+  async function refresh(){
+    try {
+      const r = await fetch(API + "/ranking");
+      if (r.ok) { data = await r.json(); render(); }
+    } catch(e){}
+  }
+  async function sign(alias){
+    const msg = $("rk-msg");
+    msg.textContent = T("Firmando…", "Signing…");
+    try {
+      const r = await fetch(API + "/registro", {method: "POST", headers: {"content-type": "application/json"},
+        body: JSON.stringify({alias, key: key(), proof: pending})});
+      const out = await r.json();
+      if (r.ok) {
+        store.set("orla-alias", alias);
+        pending = null;
+        $("rk-claim").hidden = true;
+        const bar = "▮".repeat(out.opened) + "▯".repeat(Math.max(0, 8 - out.opened));
+        shareText = "LACUNA ZERO · " + T("ARCHIVO ", "FILE ") + String(out.folder).padStart(2, "0") + "\n"
+          + T("Acceso nº ", "Access no. ") + out.pos + " · " + clock(out.secs) + "\n" + bar + "\n"
+          + T("¿Te atreves a escuchar?", "Do you dare to listen?") + "\n" + SITE;
+        $("rk-text").textContent = T("Investigador nº ", "Investigator no. ") + String(out.number).padStart(4, "0") + " · " + alias + "\n\n" + shareText;
+        $("rk-card").hidden = false;
+        refresh();
+        return;
+      }
+      const why = {taken: ["Ese alias ya está firmado. Elige otro.", "That alias is taken. Choose another."],
+        alias: ["Usa de 3 a 16 letras o números, sin espacios.", "Use 3 to 16 letters or numbers, no spaces."],
+        slow: ["Demasiados intentos. Espera un minuto.", "Too many attempts. Wait a minute."]}[out.error]
+        || ["El registro no ha aceptado la firma.", "The log rejected the signature."];
+      msg.textContent = T(...why);
+      $("rk-claim").hidden = false;
+    } catch(e){
+      msg.textContent = T("Sin conexión con el registro. Inténtalo de nuevo.", "Cannot reach the log. Try again.");
+      $("rk-claim").hidden = false;
+    }
+  }
+  window.addEventListener("orla-open", async ev => {
+    pending = await proof(ev.detail);
+    await refresh();
+    $("rk").hidden = false;
+    const alias = store.get("orla-alias");
+    if (alias) { sign(alias); return; }
+    $("rk-card").hidden = true;
+    $("rk-claim").hidden = false;
+  });
+  $("rk-f").addEventListener("submit", ev => {
+    ev.preventDefault();
+    const alias = $("rk-alias").value.trim();
+    if (alias && pending) sign(alias);
+  });
+  $("rk-share").onclick = async () => {
+    try {
+      if (navigator.share) { await navigator.share({text: shareText}); return; }
+      await navigator.clipboard.writeText(shareText);
+      $("rk-share").textContent = T("Copiado", "Copied");
+    } catch(e){}
+  };
+  ["l-es", "l-en"].forEach(id => $(id).addEventListener("click", () => setTimeout(render, 0)));
+  refresh();
+  setInterval(() => { if (!document.hidden) refresh(); }, 60000);
 })();
 </script>
