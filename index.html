@@ -456,6 +456,13 @@ footer a{color:var(--paper)}
   "use strict";
   const API = "https://archivo-orla-ranking.archivo-orla.workers.dev";
   const SITE = "archivo-orla.github.io";
+  // Contador anónimo: solo de qué red llega y si es la primera visita en este navegador.
+  try {
+    let first = 0;
+    try { if (!localStorage.getItem("orla_v")) { localStorage.setItem("orla_v", "1"); first = 1; } } catch (e) {}
+    const ref = document.referrer && !document.referrer.includes(SITE) ? new URL(document.referrer).hostname : "";
+    fetch(API + "/visita", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ r: ref, f: first }), keepalive: true }).catch(() => {});
+  } catch (e) {}
   const NAMES = [["Ficha de Inés", "Inés's file"], ["Grabaciones 4-17", "Recordings 4-17"]];
   const $ = id => document.getElementById(id);
   const T = (es, en) => document.documentElement.lang === "en" ? en : es;
